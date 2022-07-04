@@ -7,27 +7,28 @@
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //ttn
-static const PROGMEM u1_t NWKSKEY[16] = { 0x0B, 0xDD, 0x76, 0x43, 0xAE, 0xD8, 0xF7, 0x1E, 0x5A, 0xC8, 0xB1, 0x0C, 0xD3, 0x37, 0xAE, 0x80 };  //para conexão com TTN
+static const PROGMEM u1_t NWKSKEY[16] = { 0x0B, 0xDD, 0x76, 0x43, 0xAE, 0xD8, 0xF7, 0x1E, 0x5A, 0xC8, 0xB1, 0x0C, 0xD3, 0x37, 0xAE, 0x80 };
 // LoRaWAN AppSKey, application session key
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //ttn
-static const u1_t PROGMEM APPSKEY[16] = { 0xAF, 0x8D, 0x64, 0xE3, 0x88, 0xD4, 0xEE, 0x3C, 0x3B, 0xCB, 0x61, 0xA1, 0xE0, 0xF2, 0xDF, 0x1E };  //para conexão com TTN
+static const u1_t PROGMEM APPSKEY[16] = { 0xAF, 0x8D, 0x64, 0xE3, 0x88, 0xD4, 0xEE, 0x3C, 0x3B, 0xCB, 0x61, 0xA1, 0xE0, 0xF2, 0xDF, 0x1E };
 
 //
 // LoRaWAN end-device address (DevAddr)
 // See http://thethingsnetwork.org/wiki/AddressSpace
 // ttn
-static const u4_t DEVADDR = 0x260D398E;     //para conexão com TTN
-
+static const u4_t DEVADDR = 0x260D398E;
 
 
 int contador = 0;               //variável para organização do número de mensagem enviadas
 int distancia;                  //Variável que recebe o valor da distancia do sensor até o fundo da lixeira
+int esp_livre;
+int referencia;
 
 float calc_bateria;             //armazena porcentagem de bateria atual (valor estimado)
 float temp_consumido;           //armazena tempo em que o progrma está ligado
-float temp_ligado;
+float temp_ligado;              //armazena tempo em que o progrma está ligado
 float temp_max;                //tempo máximo que a bateria suporta o arduino 
 float bateria = 6.8;           // Energia para bateria de 6800mA/h
 float corrente = 0.015;       //corrente consumida (valor medido) pelo arduino
@@ -57,7 +58,7 @@ static osjob_t initjob, sendjob, blinkjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 10;   //intervalo entre o envio das mensagens, valor em segundos
+const unsigned TX_INTERVAL = 5;   //intervalo entre o envio das mensagens, valor em segundos 900s = 15min
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -88,15 +89,19 @@ void do_send(osjob_t* j) {
                         
             //Serial.println(LMIC.freq);
             Serial.println(LMIC.freq);
-            
-            Serial.print("Distância no Interior da Lixeira: ");         //Imprime o txt entre "" no monitor serial
+          
+            Serial.print("Distância na lixeira: ");         //Imprime o txt entre "" no monitor serial
             Serial.print(distancia);                                    //Imprime o valor da distancia mo monitor serial
             Serial.println(" (cm)");                                    //Imprime o txt entre "" no monitor serial
+            
+            Serial.print("Espaço livre na lixeira: ");         //Imprime o txt entre "" no monitor serial
+            Serial.print(esp_livre);                                    //Imprime o valor do espaço livre da lixeira mo monitor serial
+            Serial.println(" (%)");                                    //Imprime o txt entre "" no monitor serial
 
             Serial.print("Bateria Estimada: ");                       //Imprime o txt entre "" no monitor serial
             Serial.print(calc_bateria);                              //Imprime o valor da estimativa de bateria mo monitor serial
             Serial.println(" (%)");                                    //Imprime o txt entre "" no monitor serial
-
+            
             Serial.print("Tempo de operação do sistema: ");          //Imprime o txt entre "" no monitor serial
             Serial.print(temp_ligado);                               //Imprime o valor do tempo em que o programa está ligado mo monitor serial em segundos
             Serial.println(" (s)");                                  //Imprime o txt entre "" no monitor serial    
@@ -236,10 +241,10 @@ void loop() {
   hcsr04();                                               //função que faz a leitura da distancia até o funda da lixeira
   
   unsigned long t1 = millis();                            //registra o tempo em que o programa foi iniciado. Vaor é inteiro, porém é registrado em milisegundos
-  float t2;
+  float temp;                                             //para  armazenar conversão
   float porcentagem_max;
-  t2 = float(t1);                                        // tempo em que o programa foi iniciado, valor em segundos
-  temp_ligado = (t2/1000);
+  temp = float(t1);                                        //armazena t1 em float
+  temp_ligado = (temp/1000);                                //armazena t1 em segundos
 
   for(int i=0; i<250; i++) {                                      //Função que faz a projeção do consumo de bateria
    porcentagem_max = 100.00;                                      // bateria só pode estar em no max 100%_ carga total
@@ -247,6 +252,8 @@ void loop() {
    temp_consumido = ((temp_ligado/temp_max)*100);                    //porcentagem da bateria consumida(valor estimado)
    calc_bateria = (porcentagem_max - temp_consumido);
    }
+
+      
 }
 
 void hcsr04(){
@@ -257,12 +264,21 @@ void hcsr04(){
     digitalWrite(trigPin, HIGH);             //SETA O PINO 6 COM PULSO ALTO "HIGH"
     delayMicroseconds(10);                  //INTERVALO DE 10 MICROSSEGUNDOS
     digitalWrite(trigPin, LOW);             //SETA O PINO 6 COM PULSO BAIXO "LOW" NOVAMENTE
-
+    
     distancia = (ultrasonic.Ranging(CM));   //converte valor lido pelo sensor para valor em cm (variável int)
+    
+    
+    if (contador == 1) {                      
+    referencia = distancia;               //na primeira leitura armazena o valor da distancia como a referencia
+    }
 
-    int i_dist = distancia;
+    float dist = float (distancia);    //converte distancia para float, para calcular a porcentagem
+    float ref = float (referencia);   //converte referencia para float, para calcular a porcentagem
+    
+    esp_livre = ((dist/ref)*100);      // calcula porcentagem de espaço livre na lixeira
+    
+    int i_dist = esp_livre;
     int i_batt = int(calc_bateria);        //converte porcentagem da estimativa de bateria calculada para int
-
     
     s_tmpDist = String(i_dist);           //converte valor da distancia para string
     s_tmpBatt = String(i_batt);           //converte valor da estimativa de bateria para string
