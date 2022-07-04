@@ -7,18 +7,18 @@
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //ttn
-static const PROGMEM u1_t NWKSKEY[16] = { 0x0B, 0xDD, 0x76, 0x43, 0xAE, 0xD8, 0xF7, 0x1E, 0x5A, 0xC8, 0xB1, 0x0C, 0xD3, 0x37, 0xAE, 0x80 };
+static const PROGMEM u1_t NWKSKEY[16] = { 0x0B, 0xDD, 0x76, 0x43, 0xAE, 0xD8, 0xF7, 0x1E, 0x5A, 0xC8, 0xB1, 0x0C, 0xD3, 0x37, 0xAE, 0x80 };  //para conexão com TTN
 // LoRaWAN AppSKey, application session key
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //ttn
-static const u1_t PROGMEM APPSKEY[16] = { 0xAF, 0x8D, 0x64, 0xE3, 0x88, 0xD4, 0xEE, 0x3C, 0x3B, 0xCB, 0x61, 0xA1, 0xE0, 0xF2, 0xDF, 0x1E };
+static const u1_t PROGMEM APPSKEY[16] = { 0xAF, 0x8D, 0x64, 0xE3, 0x88, 0xD4, 0xEE, 0x3C, 0x3B, 0xCB, 0x61, 0xA1, 0xE0, 0xF2, 0xDF, 0x1E };  //para conexão com TTN
 
 //
 // LoRaWAN end-device address (DevAddr)
 // See http://thethingsnetwork.org/wiki/AddressSpace
 // ttn
-static const u4_t DEVADDR = 0x260D398E;
+static const u4_t DEVADDR = 0x260D398E;     //para conexão com TTN
 
 
 
@@ -27,8 +27,9 @@ int distancia;                  //Variável que recebe o valor da distancia do s
 
 float calc_bateria;             //armazena porcentagem de bateria atual (valor estimado)
 float temp_consumido;           //armazena tempo em que o progrma está ligado
+float temp_ligado;
 float temp_max;                //tempo máximo que a bateria suporta o arduino 
-float power = 61.2;           // (6.8A*9V) = 61.2 Watts/hora, Energia para bateria de 6800mA/h
+float bateria = 6.8;           // Energia para bateria de 6800mA/h
 float corrente = 0.015;       //corrente consumida (valor medido) pelo arduino
                   
 String s_tmpDist;
@@ -88,25 +89,25 @@ void do_send(osjob_t* j) {
             //Serial.println(LMIC.freq);
             Serial.println(LMIC.freq);
             
-            Serial.print("Distancia na lixeira ");                    //Imprime o txt entre "" no monitor serial
-            Serial.print(distancia);                                  //Imprime o valor da distancia mo monitor serial
-            Serial.println(" cm");                                    //Imprime o txt entre "" no monitor serial
+            Serial.print("Distância no Interior da Lixeira: ");         //Imprime o txt entre "" no monitor serial
+            Serial.print(distancia);                                    //Imprime o valor da distancia mo monitor serial
+            Serial.println(" (cm)");                                    //Imprime o txt entre "" no monitor serial
 
-            Serial.print("Bateria Calculada");                       //Imprime o txt entre "" no monitor serial
+            Serial.print("Bateria Estimada: ");                       //Imprime o txt entre "" no monitor serial
             Serial.print(calc_bateria);                              //Imprime o valor da estimativa de bateria mo monitor serial
-            Serial.println(" %");                                    //Imprime o txt entre "" no monitor serial
-            
-            Serial.print("Payload ");                               //Imprime o txt entre "" no monitor serial
-            Serial.print((char*)mydata);                            //Imprime o payload enviado mo monitor serial
-            Serial.println(" ");                                    //Imprime o txt entre "" no monitor serial          
+            Serial.println(" (%)");                                    //Imprime o txt entre "" no monitor serial
 
-            Serial.print("Tempo ligado ");                          //Imprime o txt entre "" no monitor serial
-            Serial.print(temp_consumido);                           //Imprime o valor do tempo em que o programa está ligado mo monitor serial
-            Serial.println(" ms");                                  //Imprime o txt entre "" no monitor serial     
+            Serial.print("Tempo de operação do sistema: ");          //Imprime o txt entre "" no monitor serial
+            Serial.print(temp_ligado);                               //Imprime o valor do tempo em que o programa está ligado mo monitor serial em segundos
+            Serial.println(" (s)");                                  //Imprime o txt entre "" no monitor serial    
+            
+            Serial.print("Payload Enviado: ");                      //Imprime o txt entre "" no monitor serial
+            Serial.print((char*)mydata);                            //Imprime o payload enviado mo monitor serial
+            Serial.println("  ");                                    //Imprime o txt entre "" no monitor serial          
 
   }
   
-  }
+}
 
 
 void onEvent (ev_t ev) {
@@ -235,11 +236,16 @@ void loop() {
   hcsr04();                                               //função que faz a leitura da distancia até o funda da lixeira
   
   unsigned long t1 = millis();                            //registra o tempo em que o programa foi iniciado. Vaor é inteiro, porém é registrado em milisegundos
-  temp_consumido = float(t1/100000);                      // tempo em que o programa foi iniciado, valor em segundos
-  
-  for(int i=0; i<250; i++) {                             //Função que faz a projeção do consumo de bateria
-   temp_max = power/corrente;                            //tempo maximo que a bateria aguenta  18 dias ou 433.3h                                 
-   calc_bateria=  ((temp_consumido/temp_max)*100);      //porcentagem da bateria(valor estimado)
+  float t2;
+  float porcentagem_max;
+  t2 = float(t1);                                        // tempo em que o programa foi iniciado, valor em segundos
+  temp_ligado = (t2/1000);
+
+  for(int i=0; i<250; i++) {                                      //Função que faz a projeção do consumo de bateria
+   porcentagem_max = 100.00;                                      // bateria só pode estar em no max 100%_ carga total
+   temp_max = ((bateria/corrente)*360);                            //tempo maximo que a bateria aguenta  18 dias ou 433.3h  ou 163.200 s                                
+   temp_consumido = ((temp_ligado/temp_max)*100);                    //porcentagem da bateria consumida(valor estimado)
+   calc_bateria = (porcentagem_max - temp_consumido);
    }
 }
 
