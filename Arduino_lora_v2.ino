@@ -249,11 +249,11 @@ void loop() {
   float temp;                                             //para  armazenar conversão
   float porcentagem_max;
   temp = float(t1);                                        //armazena t1 em float
-  temp_ligado = (temp/100000);                                //armazena t1 em segundos
+  temp_ligado = (temp/1000);                                //armazena t1 em segundos, considerando que t1 é dado em mili 
 
   for(int i=0; i<250; i++) {                                      //Função que faz a projeção do consumo de bateria
    porcentagem_max = 100.00;                                      // bateria só pode estar em no max 100%_ carga total
-   temp_max = ((bateria/corrente)*360);                            //tempo maximo que a bateria aguenta  18 dias ou 433.3h  ou 163.200 s                                
+   temp_max = ((bateria/corrente)*3600);                            //tempo maximo que a bateria aguenta  18 dias ou 433.3h  ou 163.200s , lembrando que 1h = 3600s                                
    Porcentagem_tempo_consumido = ((temp_ligado/temp_max)*100);                    //porcentagem da bateria consumida(valor estimado)
    BateiriaEstimada = (porcentagem_max - Porcentagem_tempo_consumido);
    }
