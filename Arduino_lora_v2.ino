@@ -7,18 +7,18 @@
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //ttn
-static const PROGMEM u1_t NWKSKEY[16] = { 0x0B, 0xDD, 0x76, 0x43, 0xAE, 0xD8, 0xF7, 0x1E, 0x5A, 0xC8, 0xB1, 0x0C, 0xD3, 0x37, 0xAE, 0x80 };
+static const PROGMEM u1_t NWKSKEY[16] = { 0x4D, 0x37, 0xEC, 0x94, 0x5B, 0xA2, 0x1A, 0xD2, 0x6E, 0x65, 0xDB, 0x64, 0x15, 0xD4, 0x27, 0x3F};
 // LoRaWAN AppSKey, application session key
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //ttn
-static const u1_t PROGMEM APPSKEY[16] = { 0xAF, 0x8D, 0x64, 0xE3, 0x88, 0xD4, 0xEE, 0x3C, 0x3B, 0xCB, 0x61, 0xA1, 0xE0, 0xF2, 0xDF, 0x1E };
+static const u1_t PROGMEM APPSKEY[16] = { 0x60, 0x2D, 0x02, 0xE4, 0x57, 0x15, 0x45, 0x78, 0xED, 0x46, 0xA5, 0xE0, 0x4F, 0x7B, 0x48, 0xB0};
 
 //
 // LoRaWAN end-device address (DevAddr)
 // See http://thethingsnetwork.org/wiki/AddressSpace
 // ttn
-static const u4_t DEVADDR = 0x260D398E;
+static const u4_t DEVADDR = 0x260D899A;
 
 
 int contador = 0;               //variável para organização do número de mensagem enviadas
@@ -26,8 +26,8 @@ int distancia;                  //Variável que recebe o valor da distancia do s
 int esp_livre;
 int referencia;
 
-float calc_bateria;             //armazena porcentagem de bateria atual (valor estimado)
-float temp_consumido;           //armazena tempo em que o progrma está ligado
+float BateiriaEstimada;             //armazena porcentagem de bateria atual (valor estimado)
+float Porcentagem_tempo_consumido;           //armazena tempo em que o progrma está ligado
 float temp_ligado;              //armazena tempo em que o progrma está ligado
 float temp_max;                //tempo máximo que a bateria suporta o arduino 
 float bateria = 6.8;           // Energia para bateria de 6800mA/h
@@ -35,6 +35,7 @@ float corrente = 0.015;       //corrente consumida (valor medido) pelo arduino
                   
 String s_tmpDist;
 String s_tmpBatt;
+String result;
 
 char const *c_dist;
 char const *c_batt;
@@ -58,7 +59,7 @@ static osjob_t initjob, sendjob, blinkjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 5;   //intervalo entre o envio das mensagens, valor em segundos 900s = 15min
+const unsigned TX_INTERVAL = 1;   //intervalo entre o envio das mensagens, valor em segundos 900s = 15min
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -89,7 +90,11 @@ void do_send(osjob_t* j) {
                         
             //Serial.println(LMIC.freq);
             Serial.println(LMIC.freq);
-          
+
+            Serial.print("Tamanho da Lixeira: ");         //Imprime o txt entre "" no monitor serial
+            Serial.print(referencia);                                    //Imprime o tamanho da lixeira no monitor serial
+            Serial.println(" (cm)");
+            
             Serial.print("Distância na lixeira: ");         //Imprime o txt entre "" no monitor serial
             Serial.print(distancia);                                    //Imprime o valor da distancia mo monitor serial
             Serial.println(" (cm)");                                    //Imprime o txt entre "" no monitor serial
@@ -99,7 +104,7 @@ void do_send(osjob_t* j) {
             Serial.println(" (%)");                                    //Imprime o txt entre "" no monitor serial
 
             Serial.print("Bateria Estimada: ");                       //Imprime o txt entre "" no monitor serial
-            Serial.print(calc_bateria);                              //Imprime o valor da estimativa de bateria mo monitor serial
+            Serial.print(BateiriaEstimada);                              //Imprime o valor da estimativa de bateria mo monitor serial
             Serial.println(" (%)");                                    //Imprime o txt entre "" no monitor serial
             
             Serial.print("Tempo de operação do sistema: ");          //Imprime o txt entre "" no monitor serial
@@ -244,48 +249,49 @@ void loop() {
   float temp;                                             //para  armazenar conversão
   float porcentagem_max;
   temp = float(t1);                                        //armazena t1 em float
-  temp_ligado = (temp/1000);                                //armazena t1 em segundos
+  temp_ligado = (temp/100000);                                //armazena t1 em segundos
 
   for(int i=0; i<250; i++) {                                      //Função que faz a projeção do consumo de bateria
    porcentagem_max = 100.00;                                      // bateria só pode estar em no max 100%_ carga total
    temp_max = ((bateria/corrente)*360);                            //tempo maximo que a bateria aguenta  18 dias ou 433.3h  ou 163.200 s                                
-   temp_consumido = ((temp_ligado/temp_max)*100);                    //porcentagem da bateria consumida(valor estimado)
-   calc_bateria = (porcentagem_max - temp_consumido);
+   Porcentagem_tempo_consumido = ((temp_ligado/temp_max)*100);                    //porcentagem da bateria consumida(valor estimado)
+   BateiriaEstimada = (porcentagem_max - Porcentagem_tempo_consumido);
    }
 
+    if (contador == 1) {                      
+    referencia = distancia;               //na primeira leitura armazena o valor da distancia como a referencia
+    }
+write_payload();
       
 }
 
 void hcsr04(){
-  
-    //processo de leitura da distancia, realizado pelo sensor  ultrassônico HC-SR04 ECHO
-    digitalWrite(trigPin, LOW);            //SETA O PINO 6 COM UM PULSO BAIXO "LOW"
-    delayMicroseconds(2);                    //INTERVALO DE 2 MICROSSEGUNDOS
-    digitalWrite(trigPin, HIGH);             //SETA O PINO 6 COM PULSO ALTO "HIGH"
-    delayMicroseconds(10);                  //INTERVALO DE 10 MICROSSEGUNDOS
-    digitalWrite(trigPin, LOW);             //SETA O PINO 6 COM PULSO BAIXO "LOW" NOVAMENTE
-    
-    distancia = (ultrasonic.Ranging(CM));   //converte valor lido pelo sensor para valor em cm (variável int)
-    
-    
-    if (contador == 1) {                      
-    referencia = distancia;               //na primeira leitura armazena o valor da distancia como a referencia
-    }
+    digitalWrite(trigPin, LOW); //SETA O PINO 6 COM UM PULSO BAIXO "LOW"
+    delayMicroseconds(2); //INTERVALO DE 2 MICROSSEGUNDOS
+    digitalWrite(trigPin, HIGH); //SETA O PINO 6 COM PULSO ALTO "HIGH"
+    delayMicroseconds(10); //INTERVALO DE 10 MICROSSEGUNDOS
+    digitalWrite(trigPin, LOW); //SETA O PINO 6 COM PULSO BAIXO "LOW" NOVAMENTE
+    //FUNÇÃO RANGING, FAZ A CONVERSÃO DO TEMPO DE
+    //RESPOSTA DO ECHO EM CENTIMETROS, E ARMAZENA
+    //NA VARIAVEL "distancia"
+    distancia = (ultrasonic.Ranging(CM)); //VARIÁVEL GLOBAL RECEBE O VALOR DA DISTÂNCIA MEDIDA
+    result = String(distancia); //VARIÁVEL GLOBAL DO TIPO STRING RECEBE A DISTÂNCIA(CONVERTIDO DE INTEIRO PARA STRING)
+    delay(500); //INTERVALO DE 500 MILISSEGUNDOS
+ }
 
-    float dist = float (distancia);    //converte distancia para float, para calcular a porcentagem
+ void write_payload(){
+  float dist = float (distancia);    //converte distancia para float, para calcular a porcentagem
     float ref = float (referencia);   //converte referencia para float, para calcular a porcentagem
     
     esp_livre = ((dist/ref)*100);      // calcula porcentagem de espaço livre na lixeira
     
-    int i_dist = esp_livre;
-    int i_batt = int(calc_bateria);        //converte porcentagem da estimativa de bateria calculada para int
+    int i_dist = distancia;
+    int i_batt = int(BateiriaEstimada);        //converte porcentagem da estimativa de bateria calculada para int
     
-    s_tmpDist = String(i_dist);           //converte valor da distancia para string
-    s_tmpBatt = String(i_batt);           //converte valor da estimativa de bateria para string
-    
+    s_tmpDist = result ;           //converte valor da distancia para string
+    s_tmpBatt = String(i_batt);           //converte valor da estimativa de bateria para string    
     c_dist = s_tmpDist.c_str();           //converte valor da string de distancia para char const 
-    c_batt = s_tmpBatt.c_str();           //converte valor da string de estimativa de bateria para char const 
-
-    delayMicroseconds(10);               //Intervalor de 10 microsegundos
-
- }
+    c_batt = s_tmpBatt.c_str();           //converte valor da string de estimativa de bateria para char const
+    delayMicroseconds(10);               //Intervalor de 10 microsegundos 
+  
+  }
